@@ -1,6 +1,6 @@
 {
   "name": "engineering-skills",
-  "description": "Lifecycle engineering skills (unit testing, integration testing, code review, coding standards, design patterns, SCA fixes) encoding published practice, with Java and Python references.",
-  "version": "0.1.0",
+  "description": "Lifecycle engineering skills (unit testing, integration testing, code review, coding standards, design patterns, SCA fixes) encoding published practice, with Java, Kotlin, Python and JavaScript/TypeScript references.",
+  "version": "0.2.0",
   "license": "MIT"
 }

@@ -11,7 +11,7 @@ A pattern is a named solution to a recurring problem. It is justified by the pro
 
 1. Read the code involved and its callers. Count how many variants, call sites or implementations actually exist now.
 2. Look for how the codebase already solves similar problems, and which patterns and frameworks it already uses. A dependency-injection container, for example, already supplies several patterns.
-3. Open the reference for the language in use: [Java](references/java.md) or [Python](references/python.md). Many classic patterns are a language feature in modern languages.
+3. Open the reference for the language in use: [Java](references/java.md), [Kotlin](references/kotlin.md), [Python](references/python.md) or [JavaScript and TypeScript](references/javascript-typescript.md). Many classic patterns are a language feature in modern languages.
 
 ## Workflow
 

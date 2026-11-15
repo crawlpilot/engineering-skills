@@ -11,3 +11,5 @@
 | Dependencies mocked in unit tests so error-handling edge cases can be exercised; builds without network | [Amazon Builders' Library: Automating safe, hands-off deployments](https://builder.aws.com/content/3ErTKQOTKc5NIw031UePBPxTQ6I/automating-safe-hands-off-deployments) | Read; basis for hermetic rule |
 
 From general engineering knowledge, not a cited source: the case checklist (boundaries, invalid input, state), the "write the failing test first for a bug fix" step, the ordering of test doubles, and the language reference files. Tool names and flags in the reference files should be checked against the versions a project uses.
+
+What was executed while building this repository: the Vitest APIs in `javascript-typescript.md` (`vi.fn` typing, `toHaveBeenCalledExactlyOnceWith`, fake timers, `it.each`) ran under Vitest 5.1, and every TypeScript and Python example was syntax-checked. The Java and Kotlin examples were not compiled. The Kotlin test-naming note comes from the [Android Kotlin style guide](https://developer.android.com/kotlin/style-guide), which was read.

@@ -12,7 +12,7 @@ The vulnerable code lives in someone else's package, so the only fixes are: move
 1. Identify the ecosystem and package manager, the manifest and the lockfile. A repo may have several.
 2. Get the findings in the most precise form available: advisory identifier, package, installed version, fixed version, and the file that declares it.
 3. Check for existing overrides, pins, constraints and ignore files. Earlier fixes live there and may now be stale.
-4. Open the reference for the ecosystem: [Java](references/java.md) (Maven, Gradle) or [Python](references/python.md) (pip, uv, Poetry).
+4. Open the reference for the ecosystem: [Java](references/java.md) (Maven, Gradle), [Kotlin](references/kotlin.md) (Gradle Kotlin DSL, Android), [Python](references/python.md) (pip, uv, Poetry) or [JavaScript and TypeScript](references/javascript-typescript.md) (npm, pnpm, Yarn).
 
 ## Workflow
 

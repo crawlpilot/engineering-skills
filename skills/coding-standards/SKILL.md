@@ -12,7 +12,7 @@ Code is read far more often than it is written. The order of authority is: the r
 1. Find the project's rules: formatter and linter configuration, editor config, type-checker settings, contributing guide, and any agent instruction file.
 2. Find the commands for format, lint, type check, build and test in the build file, task runner or CI config.
 3. Read the file you are changing in full, and one or two neighbours, before editing. Note naming, error handling, logging and layout.
-4. Open the reference for the language in use: [Java](references/java.md) or [Python](references/python.md).
+4. Open the reference for the language in use: [Java](references/java.md), [Kotlin](references/kotlin.md), [Python](references/python.md) or [JavaScript and TypeScript](references/javascript-typescript.md).
 
 ## Workflow
 
