@@ -1,0 +1,11 @@
+{
+  "name": "engineering-skills",
+  "owner": { "name": "engineering-skills contributors" },
+  "plugins": [
+    {
+      "name": "engineering-skills",
+      "source": "./",
+      "description": "Lifecycle engineering skills encoding published practice."
+    }
+  ]
+}
