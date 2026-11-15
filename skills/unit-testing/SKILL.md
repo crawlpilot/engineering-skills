@@ -11,7 +11,7 @@ A unit test earns its place only if it fails when the behaviour breaks and stays
 
 1. Open the code under test and two or three existing test files near it. Match their framework, naming, fixtures, assertion style and file layout.
 2. Find the test command in the build file, task runner or CI config, and run the existing suite once so you know the baseline.
-3. Open the reference for the language in use: [Java](references/java.md) or [Python](references/python.md). For other languages, apply this file and the repo's own conventions.
+3. Open the reference for the language in use: [Java](references/java.md), [Kotlin](references/kotlin.md), [Python](references/python.md) or [JavaScript and TypeScript](references/javascript-typescript.md). For other languages, apply this file and the repo's own conventions.
 
 ## Workflow
 

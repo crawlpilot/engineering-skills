@@ -4,7 +4,7 @@ Agent skills that encode published engineering practice across the development l
 
 ## Status
 
-Batch one of four. Six skills, with Java and Python references.
+Batch one of four. Six skills, each with Java, Kotlin, Python and JavaScript/TypeScript references.
 
 | Skill | Use it when |
 | --- | --- |
@@ -15,14 +15,16 @@ Batch one of four. Six skills, with Java and Python references.
 | [design-patterns](skills/design-patterns/SKILL.md) | Deciding how to structure code, or whether a pattern is warranted |
 | [sca-fixes](skills/sca-fixes/SKILL.md) | Fixing a vulnerable dependency reported by a scanner |
 
-Planned: change-authoring, dependency-hygiene, security-review, design-doc, api-design, ci-pipeline, safe-deploy, rollback-safety, observability, debugging, postmortem. Kotlin and JavaScript/TypeScript references for every skill.
+Planned: change-authoring, dependency-hygiene, security-review, design-doc, api-design, ci-pipeline, safe-deploy, rollback-safety, observability, debugging, postmortem.
 
 ## Layout
 
 ```text
 skills/<name>/SKILL.md            workflow, checklist, do-not rules, report format
 skills/<name>/references/java.md  idioms, frameworks, commands (loaded on demand)
+skills/<name>/references/kotlin.md
 skills/<name>/references/python.md
+skills/<name>/references/javascript-typescript.md
 skills/<name>/references/sources.md  where each rule comes from
 evals/<name>/cases.md             trigger prompts and task checks for the skill
 scripts/validate.py               structure and link checks, run in CI

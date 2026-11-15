@@ -11,7 +11,7 @@ Integration tests exist to catch what unit tests cannot: drift between a mock an
 
 1. Find how the repo already runs integration tests: a separate source set, marker or tag, a compose file, container fixtures, a CI job. Follow it.
 2. Find how to start dependencies locally, and what the pipeline provides.
-3. Open the reference for the language in use: [Java](references/java.md) or [Python](references/python.md).
+3. Open the reference for the language in use: [Java](references/java.md), [Kotlin](references/kotlin.md), [Python](references/python.md) or [JavaScript and TypeScript](references/javascript-typescript.md).
 
 ## Workflow
 

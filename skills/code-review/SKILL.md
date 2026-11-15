@@ -11,7 +11,7 @@ The standard: approve a change once it clearly improves the overall health of th
 
 1. Read the change description, linked issue or task. Know what the change is meant to do before reading code.
 2. Establish the diff: against the merge base for a branch, or the given range. Note its size and which files are generated, vendored or data.
-3. Open the reference for the language in use: [Java](references/java.md) or [Python](references/python.md).
+3. Open the reference for the language in use: [Java](references/java.md), [Kotlin](references/kotlin.md), [Python](references/python.md) or [JavaScript and TypeScript](references/javascript-typescript.md).
 
 ## Workflow
 
