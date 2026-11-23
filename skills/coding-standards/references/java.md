@@ -80,4 +80,7 @@ When a rule must be suppressed, scope it as narrowly as possible and say why:
 
 ```java
 @SuppressWarnings("unchecked") // Safe: the map is populated only by register(), which enforces the type.
+<T> Handler<T> handlerFor(Class<T> type) {
+  return (Handler<T>) handlers.get(type);
+}
 ```

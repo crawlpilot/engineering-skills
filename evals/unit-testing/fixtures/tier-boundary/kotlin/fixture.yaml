@@ -1,0 +1,36 @@
+# Fixture: tier lookup with an off-by-one at the bulk threshold. See ../java/fixture.yaml.
+# Built with Maven so the fixture needs no Gradle wrapper download; Gradle fixtures follow.
+id: tier-boundary-kotlin
+language: kotlin
+implementation: src/main/kotlin/com/example/pricing/Tier.kt
+tests: src/test/**/*.kt
+test_command: mvn -q -B -o test
+prepare_command: mvn -q -B test
+
+reference:
+  find: "quantity > BULK_THRESHOLD"
+  replace: "quantity >= BULK_THRESHOLD"
+
+mutants:
+  - name: bulk-at-49
+    find: "quantity >= BULK_THRESHOLD"
+    replace: "quantity >= BULK_THRESHOLD - 1"
+  - name: bulk-capped
+    find: "quantity >= BULK_THRESHOLD"
+    replace: "quantity in BULK_THRESHOLD until 1000"
+  - name: zero-not-free
+    find: "if (quantity == 0) return FREE"
+    replace: "if (quantity == 1) return FREE"
+  - name: minus-one-allowed
+    find: "require(quantity >= 0)"
+    replace: "require(quantity >= -1)"
+  - name: no-negative-guard
+    find: "require(quantity >= 0)"
+    replace: "require(true)"
+  - name: bulk-returns-standard
+    find: "return BULK"
+    replace: "return STANDARD"
+
+bug_report_patterns:
+  - "\\b50\\b"
+  - "(?i)boundar|threshold|off.by.one|>=|greater than or equal"

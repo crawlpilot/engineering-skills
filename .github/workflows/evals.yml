@@ -1,0 +1,107 @@
+name: evals
+
+# Real model runs. They cost money, so they run nightly and on demand, never on
+# every push. Needs the ANTHROPIC_API_KEY repository secret.
+on:
+  schedule:
+    - cron: "17 21 * * *"  # 02:47 IST, off the hour
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: Skill to evaluate
+        default: unit-testing
+      models:
+        description: Comma-separated models
+        default: haiku,sonnet,opus
+      repeat:
+        description: Runs per fixture, model and mode
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  check-key:
+    # Skip cleanly, instead of failing every night, until the secret is added.
+    runs-on: ubuntu-latest
+    outputs:
+      has_key: ${{ steps.check.outputs.has_key }}
+    steps:
+      - id: check
+        env:
+          KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$KEY" ]; then echo "has_key=true" >> "$GITHUB_OUTPUT"
+          else echo "::notice::ANTHROPIC_API_KEY is not set; skipping model evals."; fi
+
+  tasks:
+    needs: check-key
+    if: needs.check-key.outputs.has_key == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java, kotlin, python]
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r scripts/requirements.txt
+      - run: npm install -g @anthropic-ai/claude-code
+      - name: Run evals
+        run: |
+          python3 scripts/evals/run_evals.py \
+            --skill "${{ inputs.skill || 'unit-testing' }}" \
+            --models "${{ inputs.models || 'haiku,sonnet,opus' }}" \
+            --repeat "${{ inputs.repeat || '1' }}" \
+            --language ${{ matrix.language }} \
+            --out "$RUNNER_TEMP/evals"
+          cat "$RUNNER_TEMP/evals/summary.md" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evals-${{ matrix.language }}
+          path: ${{ runner.temp }}/evals
+
+  routing:
+    needs: check-key
+    if: needs.check-key.outputs.has_key == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [haiku, sonnet, opus]
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r scripts/requirements.txt
+      - run: npm install -g @anthropic-ai/claude-code
+      - name: Routing across all skills
+        run: python3 scripts/evals/run_routing.py --model ${{ matrix.model }} --out "$RUNNER_TEMP/routing"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: routing-${{ matrix.model }}
+          path: ${{ runner.temp }}/routing

@@ -1,0 +1,35 @@
+# Fixture: tier lookup with an off-by-one at the bulk threshold. See ../java/fixture.yaml.
+id: tier-boundary-python
+language: python
+implementation: src/pricing/tiers.py
+tests: tests/**/*.py
+# The grader runs this with the Python that runs the grader; pytest must be installed.
+test_command: "{python} -m pytest -q -p no:cacheprovider"
+
+reference:
+  find: "quantity > BULK_THRESHOLD"
+  replace: "quantity >= BULK_THRESHOLD"
+
+mutants:
+  - name: bulk-at-49
+    find: "quantity >= BULK_THRESHOLD"
+    replace: "quantity >= BULK_THRESHOLD - 1"
+  - name: bulk-capped
+    find: "quantity >= BULK_THRESHOLD"
+    replace: "BULK_THRESHOLD <= quantity < 1000"
+  - name: zero-not-free
+    find: "if quantity == 0:"
+    replace: "if quantity == 1:"
+  - name: minus-one-allowed
+    find: "if quantity < 0:"
+    replace: "if quantity < -1:"
+  - name: no-negative-guard
+    find: "if quantity < 0:"
+    replace: "if False:"
+  - name: bulk-returns-standard
+    find: "return Tier.BULK"
+    replace: "return Tier.STANDARD"
+
+bug_report_patterns:
+  - "\\b50\\b"
+  - "(?i)boundar|threshold|off.by.one|>=|greater than or equal"
