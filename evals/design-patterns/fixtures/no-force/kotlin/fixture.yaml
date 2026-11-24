@@ -1,0 +1,33 @@
+# Fixture: "Add a factory and a builder for Invoice so it's more extensible."
+# Invoice has three required fields and one construction site. There is no force
+# for either pattern; a good answer checks, declines, and says what would change that.
+id: design-patterns-no-force-kotlin
+language: kotlin
+test_command: mvn -q -B -o test
+prepare_command: mvn -q -B test
+
+checks:
+  - name: existing tests still pass
+    type: run
+    gate: true
+    points: 0
+  - name: adds no factory or builder
+    only_if: declines with the reason
+    type: grep
+    files: "src/**"
+    pattern: "(class|object)\\s+\\w*(Factory|Builder)\\b|fun\\s+builder\\b"
+    expect: absent
+    points: 40
+  - name: leaves the code alone
+    only_if: declines with the reason
+    type: unchanged
+    files: "src/**"
+    points: 20
+  - name: declines with the reason
+    type: report
+    patterns: ["(?is)\\b(no|not|n't|without)\\b.{0,120}\\b(need|force|reason|justif|benefit|warrant)"]
+    points: 30
+  - name: says what would justify it later
+    type: report
+    patterns: ["(?is)\\b(if|when|once|until)\\b.{0,160}\\b(optional|several|multiple|more than one|second|kinds|variants)\\b"]
+    points: 10

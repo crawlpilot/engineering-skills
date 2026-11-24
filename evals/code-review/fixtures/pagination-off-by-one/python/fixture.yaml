@@ -1,0 +1,40 @@
+# Fixture: review a feature branch that adds pagination.
+# Planted: page numbers are documented as starting at 1, but page 1 skips the
+# first page_size orders (start = page * page_size). The include_cancelled branch
+# has no test. Two nits: an unused import and a camelCase local.
+# The existing tests pass, so only reading the code finds the bug.
+id: code-review-pagination-python
+language: python
+change: change
+change_message: "Add paginated order listing"
+test_command: "{python} -m pytest -q -p no:cacheprovider"
+
+checks:
+  - name: finds the off-by-one
+    type: report
+    patterns:
+      - "(?i)\\bpage"
+      - "(?i)off.by.one|first page|skip|page ?- ?1|1-based|one-based|numbered from 1|from 1|starts? at 1"
+    points: 35
+  - name: calls the bug blocking
+    type: report
+    patterns: ["(?i)block|must.fix|request(ed)? changes|changes requested|do not merge|don't merge|not ready"]
+    points: 15
+  - name: reports the untested branch
+    type: report
+    patterns: ["(?is)include_?cancelled.{0,300}\\btest|\\btest.{0,300}include_?cancelled"]
+    points: 20
+  - name: does not approve
+    only_if: finds the off-by-one
+    type: report
+    absent: ["(?im)\\blgtm\\b|ship it|^\\W*(verdict\\W*)?approved?\\b"]
+    points: 10
+  - name: ran the tests
+    type: ran
+    pattern: "pytest"
+    points: 10
+  - name: leaves the code alone
+    only_if: finds the off-by-one
+    type: unchanged
+    files: "{src,tests}/**"
+    points: 10

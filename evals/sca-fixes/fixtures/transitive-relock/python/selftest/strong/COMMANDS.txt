@@ -1,0 +1,3 @@
+uv tree --invert --package urllib3
+uv lock --upgrade-package urllib3
+uv run --frozen --group test pytest -q

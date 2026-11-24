@@ -1,0 +1,46 @@
+# Fixture: "Fix GHSA-w33c-445m-f8w7."
+# okhttp 4.9.0 brings in okio 2.8.0, affected by CVE-2023-3635 (fixed in okio 3.4.0).
+# okhttp 4.12.0, still 4.x, depends on okio 3.6.0, so a parent upgrade fixes it and
+# beats pinning okio with an override. Verified against OSV and the okhttp POMs, Nov 2026.
+# Graded online (no -o): the fix pulls in artifacts the prepare step never saw.
+id: sca-fixes-parent-upgrade-java
+language: java
+requires: [mvn]
+test_command: mvn -q -B test
+prepare_command: mvn -q -B test dependency:tree
+
+checks:
+  - name: builds and tests pass
+    type: run
+    gate: true
+    points: 10
+  - name: okio resolves to a fixed version
+    type: run
+    command: mvn -B dependency:tree -Dincludes=com.squareup.okio
+    output: "com\\.squareup\\.okio:okio(-jvm)?:jar:(3\\.([4-9]|\\d{2,})|[4-9])\\."
+    output_absent: "com\\.squareup\\.okio:okio(-jvm)?:jar:(2\\.|3\\.[0-3]\\.)"
+    points: 35
+  - name: fixed by upgrading the parent within 4.x
+    type: run
+    command: mvn -B dependency:tree -Dincludes=com.squareup.okhttp3
+    output: "com\\.squareup\\.okhttp3:okhttp:jar:4\\.(1[2-9]|[2-9]\\d)\\."
+    points: 20
+  - name: no override pinning okio
+    only_if: okio resolves to a fixed version
+    type: grep
+    files: pom.xml
+    pattern: "<artifactId>okio(-jvm)?</artifactId>"
+    expect: absent
+    points: 10
+  - name: report shows the dependency path
+    type: report
+    patterns: ["(?i)okhttp", "(?i)okio", "(?i)GHSA-w33c-445m-f8w7|CVE-2023-3635"]
+    points: 10
+  - name: ran the build and tests
+    type: ran
+    pattern: "\\b(mvn|mvnw|gradle|gradlew)\\b.*\\btest\\b"
+    points: 10
+  - name: checked the dependency tree
+    type: ran
+    pattern: "dependency:tree|\\bdependencies\\b|dependencyInsight"
+    points: 5

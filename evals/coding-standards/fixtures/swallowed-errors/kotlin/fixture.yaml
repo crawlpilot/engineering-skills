@@ -1,0 +1,36 @@
+# Fixture: "This silently fails sometimes. Fix it." See ../python/fixture.yaml.
+id: coding-standards-swallowed-kotlin
+language: kotlin
+test_command: mvn -q -B -o test
+prepare_command: mvn -q -B test
+
+checks:
+  - name: existing tests still pass
+    only_if: failures raise with context and cause
+    type: run
+    gate: true
+    points: 10
+  - name: failures raise with context and cause
+    type: run
+    overlay: grading/hidden
+    points: 45
+  - name: follows the project's error convention
+    type: run
+    overlay: grading/convention
+    points: 10
+  - name: no broad catch left
+    only_if: failures raise with context and cause
+    type: grep
+    files: src/main/kotlin/com/example/rates/RateClient.kt
+    pattern: "catch\\s*\\(\\s*\\w+\\s*:\\s*(Exception|Throwable)\\s*\\)"
+    expect: absent
+    points: 15
+  - name: touches only what the fix needs
+    only_if: failures raise with context and cause
+    type: unchanged
+    files: "{pom.xml,src/main/kotlin/com/example/rates/ServiceException.kt,src/main/kotlin/com/example/rates/HolidayClient.kt,src/main/kotlin/com/example/rates/Transport.kt}"
+    points: 10
+  - name: ran the tests
+    type: ran
+    pattern: "\\b(mvn|mvnw|gradle|gradlew)\\b.*\\btest\\b"
+    points: 10

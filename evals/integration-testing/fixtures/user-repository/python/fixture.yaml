@@ -1,0 +1,61 @@
+# Fixture: "Add integration tests for this repository."
+# UserRepository talks to PostgreSQL; the schema comes from migrations/. Graded by
+# mutating the repository and the migration: only tests that run real SQL against
+# the real schema catch them. Mocks and in-memory substitutes don't.
+id: integration-user-repository-python
+language: python
+requires: [uv, docker]
+test_command: "uv run -q --frozen --group test pytest -q -p no:cacheprovider"
+
+checks:
+  - name: tests kill the mutants
+    type: mutation
+    points: 60
+    mutants:
+      - name: find-ignores-email
+        file: src/accounts/repository.py
+        find: '"SELECT id, email, name FROM users WHERE email = %s", (email.lower(),)'
+        replace: '"SELECT id, email, name FROM users ORDER BY id LIMIT 1", ()'
+      - name: find-is-case-sensitive
+        file: src/accounts/repository.py
+        find: "WHERE email = %s\", (email.lower(),)"
+        replace: "WHERE email = %s\", (email,)"
+      - name: not-found-crashes
+        file: src/accounts/repository.py
+        find: "return User(*row) if row else None"
+        replace: "return User(*row)"
+      - name: duplicate-not-translated
+        file: src/accounts/repository.py
+        find: "except errors.UniqueViolation as exc:"
+        replace: "except errors.CheckViolation as exc:"
+      - name: migration-drops-unique
+        file: migrations/001_create_users.sql
+        find: "email TEXT NOT NULL UNIQUE"
+        replace: "email TEXT NOT NULL"
+  - name: runs PostgreSQL in a container
+    type: grep
+    files: "tests/**/*.py"
+    pattern: "testcontainers|PostgresContainer"
+    only_if: tests kill the mutants
+    points: 10
+  - name: no in-memory substitute
+    type: grep
+    files: "tests/**/*.py"
+    pattern: "sqlite|:memory:"
+    expect: absent
+    only_if: tests kill the mutants
+    points: 10
+  - name: marked for the integration stage
+    type: grep
+    files: "tests/**/*.py"
+    pattern: "pytest\\.mark\\.integration"
+    only_if: tests kill the mutants
+    points: 10
+  - name: report gives repeat runs and timing
+    type: report
+    patterns: ["(?i)\\b\\d+\\b.{0,30}(consecutive|times|runs)", "(?i)\\d+(\\.\\d+)?\\s*(s|sec|secs|seconds|ms)\\b"]
+    points: 5
+  - name: ran the tests
+    type: ran
+    pattern: "pytest"
+    points: 5

@@ -1,0 +1,3 @@
+mvn dependency:tree -Dincludes=com.squareup.okio
+mvn -q test
+mvn dependency:tree -Dincludes=com.squareup.okio

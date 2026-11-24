@@ -1,0 +1,3 @@
+mvn -q verify
+mvn -q verify
+mvn -q verify

@@ -4,7 +4,12 @@ A fixture is a directory holding:
 
     fixture.yaml   what to run and how to grade (see evals/unit-testing/fixtures/*/java)
     project/       the code the agent is given
-    selftest/      optional known-good (strong/) and known-weak (weak/) test suites
+    change/        optional: files committed on a `feature` branch (review tasks)
+    selftest/      known-good (strong/) and known-weak (weak/) answers
+
+There are two kinds. A mutation fixture (it has `reference`) grades the tests the
+agent wrote; that is what this module does. A checks fixture (it has `checks`)
+grades anything else with typed checks; see checks.py. `grade_any` picks.
 
 Grading never trusts the agent's copy of the implementation under test. For each
 variant (reference, planted bug, every mutant) it copies the agent's workspace,
@@ -54,13 +59,21 @@ class Fixture:
     root: Path
     id: str
     language: str
-    implementation: str
-    tests: str
     test_command: str
-    reference: Replacement
-    mutants: list[Mutant]
+    implementation: str = ""
+    tests: str = ""
+    reference: Replacement | None = None
+    mutants: list[Mutant] = field(default_factory=list)
     prepare_command: str | None = None
     bug_report_patterns: list[str] = field(default_factory=list)
+    checks: list[dict] = field(default_factory=list)
+    change: str | None = None
+    change_message: str | None = None
+    requires: list[str] = field(default_factory=list)
+
+    @property
+    def kind(self) -> str:
+        return "mutation" if self.reference else "checks"
 
     @property
     def project(self) -> Path:
@@ -84,19 +97,26 @@ class Fixture:
 
 def load_fixture(root: Path) -> Fixture:
     data = yaml.safe_load((root / "fixture.yaml").read_text(encoding="utf-8"))
-    return Fixture(
+    fixture = Fixture(
         root=root,
         id=data["id"],
         language=data["language"],
-        implementation=data["implementation"],
-        tests=data["tests"],
         test_command=data["test_command"],
+        implementation=data.get("implementation", ""),
+        tests=data.get("tests", ""),
         prepare_command=data.get("prepare_command"),
-        reference=Replacement(**data["reference"]),
+        reference=Replacement(**data["reference"]) if "reference" in data else None,
         mutants=[Mutant(find=m["find"], replace=m["replace"], name=m["name"])
                  for m in data.get("mutants", [])],
         bug_report_patterns=data.get("bug_report_patterns", []),
+        checks=data.get("checks", []),
+        change=data.get("change"),
+        change_message=data.get("change_message"),
+        requires=data.get("requires", []),
     )
+    if not fixture.reference and not fixture.checks:
+        raise ValueError(f"{root}: a fixture needs `reference` (mutation) or `checks`")
+    return fixture
 
 
 def copy_tree(src: Path, dst: Path) -> None:
@@ -119,16 +139,25 @@ def prepare(fixture: Fixture) -> tuple[bool, str]:
     """Warm dependency caches so graded runs can work offline."""
     if not fixture.prepare_command:
         return True, ""
+    from checks import starting_workspace
     with tempfile.TemporaryDirectory(prefix=f"{fixture.id}-prepare-") as tmp:
-        copy_tree(fixture.project, Path(tmp))
+        starting_workspace(fixture, Path(tmp))
         return run(fixture.command(fixture.prepare_command), Path(tmp))
 
 
 def glob_to_regex(pattern: str) -> re.Pattern[str]:
-    """Translate a path glob where `**/` matches zero or more directories."""
+    """Translate a path glob where `**/` matches zero or more directories.
+
+    Also supports one level of braces: `{src,tests}/**`.
+    """
     out, i = [], 0
     while i < len(pattern):
-        if pattern.startswith("**/", i):
+        if pattern[i] == "{" and "}" in pattern[i:]:
+            end = pattern.index("}", i)
+            options = pattern[i + 1:end].split(",")
+            out.append("(?:" + "|".join(re.escape(o) for o in options) + ")")
+            i = end + 1
+        elif pattern.startswith("**/", i):
             out.append("(?:.*/)?")
             i += 3
         elif pattern.startswith("**", i):
@@ -258,6 +287,28 @@ def grade(fixture: Fixture, workspace: Path, report: str | None = None) -> Grade
 
     return Grade(fixture.id, files, passes_on_reference, catches_bug, encodes_bug, killed,
                  implementation_changed, report_names_bug, score, notes, outputs)
+
+
+def grade_any(fixture: Fixture, workspace: Path, report: str | None = None,
+              commands: list[str] | None = None):
+    """Grade with whichever method the fixture uses. Both results have .score and .to_dict()."""
+    if fixture.kind == "mutation":
+        return grade(fixture, workspace, report=report)
+    from checks import grade_checks
+    return grade_checks(fixture, workspace, report=report, commands=commands)
+
+
+def missing_requirements(fixture: Fixture) -> list[str]:
+    """Requirements in fixture.yaml (e.g. docker) not available on this machine."""
+    missing = []
+    for tool in ("uv", "mvn"):
+        if tool in fixture.requires and not shutil.which(tool):
+            missing.append(tool)
+    if "docker" in fixture.requires:
+        ok = subprocess.run("docker info", shell=True, capture_output=True).returncode == 0
+        if not ok:
+            missing.append("docker")
+    return missing
 
 
 def find_fixtures(root: Path) -> list[Path]:

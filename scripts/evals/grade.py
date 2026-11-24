@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fixtures import grade, load_fixture, prepare  # noqa: E402
+from fixtures import grade_any, load_fixture, prepare  # noqa: E402
 
 
 def main() -> int:
@@ -23,6 +23,7 @@ def main() -> int:
     parser.add_argument("fixture", type=Path)
     parser.add_argument("workspace", type=Path)
     parser.add_argument("--report", type=Path, help="file holding the agent's final report")
+    parser.add_argument("--commands", type=Path, help="file with the shell commands the agent ran, one per line")
     parser.add_argument("--verbose", action="store_true", help="include test output per variant")
     args = parser.parse_args()
 
@@ -31,7 +32,8 @@ def main() -> int:
     if not ok:
         sys.exit(f"prepare_command failed:\n{out}")
     report = args.report.read_text(encoding="utf-8") if args.report else None
-    g = grade(fixture, args.workspace.resolve(), report=report)
+    commands = args.commands.read_text().splitlines() if args.commands else None
+    g = grade_any(fixture, args.workspace.resolve(), report=report, commands=commands)
     print(json.dumps(g.to_dict(with_outputs=args.verbose), indent=2))
     return 0
 

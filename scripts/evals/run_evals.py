@@ -40,19 +40,13 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from fixtures import copy_tree, grade, load_fixture, prepare  # noqa: E402
+from checks import git_with_change  # noqa: E402
+from fixtures import copy_tree, grade_any, load_fixture, missing_requirements, prepare  # noqa: E402
 from transcript import parse as parse_transcript  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 ALLOWED_TOOLS = "Bash Read Edit Write Glob Grep Skill TodoWrite"
 AGENT_TIMEOUT_SECONDS = 1800  # a JVM agent run that compiles and tests several times
-
-
-def git_init(path: Path) -> None:
-    for cmd in (["git", "init", "-q"], ["git", "add", "-A"],
-                ["git", "-c", "user.email=eval@example.com", "-c", "user.name=eval",
-                 "commit", "-q", "-m", "fixture"]):
-        subprocess.run(cmd, cwd=path, check=True, capture_output=True)
 
 
 def run_agent(workspace: Path, prompt: str, model: str, args, fixture_dir: Path) -> str:
@@ -88,9 +82,11 @@ def run_one(task: dict, fixture_dir: Path, skill: str, model: str, mode: str,
     with tempfile.TemporaryDirectory(prefix=f"eval-{fixture.id}-") as tmp:
         ws = Path(tmp)
         copy_tree(fixture.project, ws)
+        git_with_change(fixture, ws)  # project on main; change/ on a feature branch
         if mode == "with":
+            # Installed after the commits, so the skill never shows up in the diff.
             shutil.copytree(ROOT / "skills" / skill, ws / ".claude" / "skills" / skill)
-        git_init(ws)
+            (ws / ".git" / "info" / "exclude").write_text(".claude/\n")
 
         started = time.monotonic()
         raw = run_agent(ws, task["prompt"], model, args, fixture_dir)
@@ -100,7 +96,7 @@ def run_one(task: dict, fixture_dir: Path, skill: str, model: str, mode: str,
         transcript_path.write_text(raw, encoding="utf-8")
         t = parse_transcript(raw)
 
-        g = grade(fixture, ws, report=t.result or None)
+        g = grade_any(fixture, ws, report=t.result or None, commands=t.bash_commands)
         process = {name: any(re.search(pattern, c) for c in t.bash_commands)
                    for name, pattern in (task.get("process") or {}).items()}
 
@@ -131,11 +127,13 @@ def summarize(records: list[dict]) -> str:
         a, b = mean(without, "score"), mean(with_, "score")
         delta = f"{b - a:+.0f}" if a is not None and b is not None else "n/a"
         loaded = (f"{sum(r['skill_loaded'] for r in with_)}/{len(with_)}" if with_ else "n/a")
-        ran = sum(r["process"].get("ran_tests", False) for r in with_ or without)
+        rows = with_ or without
+        ran = (f"{sum(r['process'].get('ran_tests', False) for r in rows)}/{len(rows)}"
+               if any("ran_tests" in r["process"] for r in rows) else "in score")
         cost = mean(with_, "cost_usd")
         lines.append(f"| {task} | {lang} | {model} | "
                      f"{'n/a' if a is None else f'{a:.0f}'} | {'n/a' if b is None else f'{b:.0f}'} | "
-                     f"{delta} | {loaded} | {ran}/{len(with_ or without)} | "
+                     f"{delta} | {loaded} | {ran} | "
                      f"{'n/a' if cost is None else f'{cost:.2f}'} |")
     return "\n".join(lines)
 
@@ -169,6 +167,9 @@ def main() -> int:
             fixture_dir = ROOT / "evals" / args.skill / rel
             fixture = load_fixture(fixture_dir)
             if args.language and fixture.language != args.language:
+                continue
+            if missing := missing_requirements(fixture):
+                print(f"skipping {fixture.id}: needs {', '.join(missing)}")
                 continue
             if fixture_dir not in prepared:
                 ok, out = prepare(fixture)

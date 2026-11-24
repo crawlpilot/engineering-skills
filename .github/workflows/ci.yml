@@ -26,12 +26,14 @@ jobs:
         run: python3 scripts/evals/test_evals.py
 
   fixtures:
-    # Proves each eval fixture is fair: the project builds, a known-good suite
-    # kills every mutant, and a known-weak suite scores low.
+    # Proves each eval fixture is fair: the starting project builds, every mutant
+    # compiles and survives the existing tests, a known-good answer scores 100, and
+    # a known-weak answer and doing nothing both score 60 or less.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        skill: [unit-testing, integration-testing, code-review, coding-standards, design-patterns, sca-fixes]
         language: [java, kotlin, python]
     steps:
       - uses: actions/checkout@v4
@@ -47,8 +49,11 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - if: matrix.language == 'python'
+        uses: astral-sh/setup-uv@v6
       - name: Fixture self-test
-        run: python3 scripts/evals/selftest_fixtures.py --language ${{ matrix.language }}
+        # --strict: a fixture that needs Docker or uv fails here instead of skipping.
+        run: python3 scripts/evals/selftest_fixtures.py --strict --skill ${{ matrix.skill }} --language ${{ matrix.language }}
 
   harness:
     # Runs the full eval pipeline with a stand-in agent: no model calls, no secrets.
@@ -62,8 +67,13 @@ jobs:
           cache-dependency-path: scripts/requirements.txt
       - run: pip install -r scripts/requirements.txt
       - name: End-to-end run with the fake agent
+        # One mutation fixture and one checks fixture with a feature branch.
         run: |
           python3 scripts/evals/run_evals.py --skill unit-testing --language python \
             --agent-cmd "python3 $GITHUB_WORKSPACE/scripts/evals/fake_agent.py" \
-            --out "$RUNNER_TEMP/eval-plumbing"
-          grep -q "| +92 |" "$RUNNER_TEMP/eval-plumbing/summary.md"
+            --out "$RUNNER_TEMP/eval-unit"
+          grep -q "| +92 |" "$RUNNER_TEMP/eval-unit/summary.md"
+          python3 scripts/evals/run_evals.py --skill code-review --language python \
+            --agent-cmd "python3 $GITHUB_WORKSPACE/scripts/evals/fake_agent.py" \
+            --out "$RUNNER_TEMP/eval-review"
+          grep -q "| +100 |" "$RUNNER_TEMP/eval-review/summary.md"

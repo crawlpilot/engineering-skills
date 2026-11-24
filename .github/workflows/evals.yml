@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       skill:
-        description: Skill to evaluate
-        default: unit-testing
+        description: Skill to evaluate (or "all")
+        default: all
       models:
         description: Comma-separated models
         default: haiku,sonnet,opus
@@ -57,6 +57,7 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - uses: astral-sh/setup-uv@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -64,13 +65,16 @@ jobs:
       - run: npm install -g @anthropic-ai/claude-code
       - name: Run evals
         run: |
-          python3 scripts/evals/run_evals.py \
-            --skill "${{ inputs.skill || 'unit-testing' }}" \
-            --models "${{ inputs.models || 'haiku,sonnet,opus' }}" \
-            --repeat "${{ inputs.repeat || '1' }}" \
-            --language ${{ matrix.language }} \
-            --out "$RUNNER_TEMP/evals"
-          cat "$RUNNER_TEMP/evals/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          skill="${{ inputs.skill || 'all' }}"
+          if [ "$skill" = all ]; then skills=$(ls evals/*/cases.yaml | cut -d/ -f2); else skills=$skill; fi
+          for s in $skills; do
+            python3 scripts/evals/run_evals.py --skill "$s" \
+              --models "${{ inputs.models || 'haiku,sonnet,opus' }}" \
+              --repeat "${{ inputs.repeat || '1' }}" \
+              --language ${{ matrix.language }} \
+              --out "$RUNNER_TEMP/evals/$s"
+            cat "$RUNNER_TEMP/evals/$s/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:

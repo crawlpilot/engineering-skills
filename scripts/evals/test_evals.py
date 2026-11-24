@@ -12,6 +12,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import checks  # noqa: E402
 import fixtures  # noqa: E402
 import run_routing  # noqa: E402
 import transcript  # noqa: E402
@@ -26,6 +27,12 @@ class GlobTest(unittest.TestCase):
         self.assertTrue(rx.match("tests/unit/deep/test_a.py"))
         self.assertFalse(rx.match("src/a.py"))
         self.assertFalse(rx.match("tests/test_a.pyc"))
+
+    def test_braces_match_any_option(self):
+        rx = fixtures.glob_to_regex("{src,tests}/**")
+        self.assertTrue(rx.match("src/a/b.py"))
+        self.assertTrue(rx.match("tests/t.py"))
+        self.assertFalse(rx.match("docs/x.md"))
 
     def test_single_star_stays_inside_one_directory(self):
         rx = fixtures.glob_to_regex("src/*.java")
@@ -47,14 +54,38 @@ class ReplacementTest(unittest.TestCase):
 
 
 class FixtureFilesTest(unittest.TestCase):
-    def test_every_fixture_has_valid_variants(self):
+    def test_every_fixture_is_well_formed(self):
+        """Static checks on every fixture.yaml; nothing is built or run."""
+        known = {"run", "grep", "unchanged", "report", "ran", "uv_lock", "mutation"}
         dirs = fixtures.find_fixtures(ROOT / "evals")
         self.assertTrue(dirs, "no fixtures found")
         for d in dirs:
             f = fixtures.load_fixture(d)
-            variants = f.variants()  # raises if a find string is missing or repeated
-            self.assertEqual(len(set(variants.values())), len(variants),
-                             f"{f.id}: two variants are identical")
+            with self.subTest(fixture=f.id):
+                self.assertTrue((d / "selftest" / "strong").is_dir())
+                self.assertTrue((d / "selftest" / "weak").is_dir())
+                if f.kind == "mutation":
+                    variants = f.variants()  # raises if a find string is missing or repeated
+                    self.assertEqual(len(set(variants.values())), len(variants))
+                    continue
+                with tempfile.TemporaryDirectory() as tmp:
+                    start = Path(tmp)
+                    checks.starting_workspace(f, start)
+                    names = [c["name"] for c in f.checks]
+                    self.assertEqual(len(names), len(set(names)), "duplicate check names")
+                    self.assertGreater(sum(int(c.get("points", 0)) for c in f.checks), 0)
+                    for c in f.checks:
+                        self.assertIn(c["type"], known, c["name"])
+                        if c.get("only_if"):
+                            self.assertIn(c["only_if"], names, c["name"])
+                        if c.get("overlay"):
+                            self.assertTrue((d / c["overlay"]).is_dir(), c["overlay"])
+                        for e in c.get("edits", []):
+                            self.assertIsNone(checks._apply_edits(start, []))
+                            self.assertTrue((start / e["file"]).exists(), e["file"])
+                        for m in c.get("mutants", []):
+                            text = (start / m.get("file", c.get("file", ""))).read_text()
+                            self.assertEqual(text.count(m["find"]), 1, f"mutant {m['name']}")
 
     def test_detects_added_and_changed_tests_only(self):
         f = fixtures.load_fixture(ROOT / "evals/unit-testing/fixtures/tier-boundary/python")
@@ -75,6 +106,67 @@ class FixtureFilesTest(unittest.TestCase):
             g = fixtures.grade(f, Path(tmp))
         self.assertEqual(g.score, 0)
         self.assertIn("no test files", g.notes[0])
+
+
+class ChecksTest(unittest.TestCase):
+    """Check types on a tiny in-memory fixture; nothing is built or run."""
+
+    def make(self, checks_list):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "project").mkdir()
+        (root / "project" / "app.txt").write_text("hello\n")
+        f = fixtures.Fixture(root=root, id="t", language="python", test_command="true",
+                             checks=checks_list)
+        ws = root / "ws"
+        fixtures.copy_tree(f.project, ws)
+        return f, ws
+
+    def test_report_patterns_and_absent(self):
+        f, ws = self.make([{"name": "r", "type": "report", "points": 10,
+                            "patterns": ["bug"], "absent": ["(?i)lgtm"]}])
+        self.assertEqual(checks.grade_checks(f, ws, report="found a bug").score, 100)
+        self.assertEqual(checks.grade_checks(f, ws, report="bug, but LGTM").score, 0)
+
+    def test_skipped_checks_do_not_count(self):
+        f, ws = self.make([{"name": "r", "type": "report", "points": 50, "patterns": ["x"]},
+                           {"name": "u", "type": "unchanged", "files": "*.txt", "points": 50}])
+        g = checks.grade_checks(f, ws, report=None)
+        self.assertIsNone(g.checks[0].passed)
+        self.assertEqual(g.score, 100)
+
+    def test_unchanged_sees_edits_and_new_files(self):
+        f, ws = self.make([{"name": "u", "type": "unchanged", "files": "*.txt", "points": 10}])
+        (ws / "new.txt").write_text("x")
+        self.assertIn("new.txt", checks.grade_checks(f, ws).checks[0].note)
+
+    def test_only_if_withholds_points_but_not_the_gate(self):
+        f, ws = self.make([
+            {"name": "fix", "type": "report", "points": 50, "patterns": ["fixed"]},
+            {"name": "restraint", "type": "unchanged", "files": "*.txt", "points": 50,
+             "gate": True, "only_if": "fix"}])
+        g = checks.grade_checks(f, ws, report="nothing done")
+        self.assertEqual(g.score, 0)
+        self.assertTrue(g.checks[1].passed)  # passed, so the gate holds
+        self.assertEqual(g.checks[1].earned, 0)
+        self.assertEqual(checks.grade_checks(f, ws, report="fixed").score, 100)
+
+    def test_gate_failure_zeroes_the_score(self):
+        f, ws = self.make([{"name": "g", "type": "report", "points": 10, "gate": True,
+                            "patterns": ["yes"]},
+                           {"name": "u", "type": "unchanged", "files": "*.txt", "points": 90}])
+        self.assertEqual(checks.grade_checks(f, ws, report="no").score, 0)
+
+    def test_regex_edit_reports_missing_target(self):
+        f, ws = self.make([])
+        err = checks._apply_edits(ws, [{"file": "app.txt", "find": "^bye", "replace": "x",
+                                        "regex": True}])
+        self.assertIn("not found", err)
+
+    def test_version_compare(self):
+        self.assertLess(checks._version("2.2.1"), checks._version("2.5.0"))
+        self.assertGreater(checks._version("2.10.0"), checks._version("2.5.0"))
 
 
 class TranscriptTest(unittest.TestCase):

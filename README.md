@@ -28,7 +28,7 @@ skills/<name>/references/javascript-typescript.md
 skills/<name>/references/sources.md  where each rule comes from
 evals/<name>/cases.md             trigger prompts and task checks for the skill
 evals/<name>/cases.yaml           machine-readable tasks for the eval runner
-evals/<name>/fixtures/            runnable sample projects with a planted defect
+evals/<name>/fixtures/            runnable sample projects, graders and known-good answers
 scripts/validate.py               structure and link checks, run in CI
 scripts/check_examples.py         syntax check of every code example, run in CI
 scripts/evals/                    eval runner, grader, routing test, fixture self-test
@@ -67,41 +67,49 @@ CI runs both on every push and pull request. `check_examples.py` is a syntax che
 
 ## Evals
 
-A skill change should make an agent measurably better at the task. The evals measure that by running the same task with and without the skill.
+A skill change should make an agent measurably better at the task. The evals measure that by running the same task with and without the skill, on small real projects in Java, Kotlin and Python. No model judges the work: every check is a build, a test run, a file comparison or a pattern match.
 
-**Fixtures.** Each task runs on small, real projects in Java, Kotlin and Python with one planted defect. The first is `evals/unit-testing/fixtures/tier-boundary`: a price-tier lookup whose code says 51 items is bulk while its docs say 50.
+| Skill | Task | What the agent is given | How it's graded |
+| --- | --- | --- | --- |
+| unit-testing | tier-boundary | A tier lookup whose code makes 51 items bulk while its docs say 50 | Agent's tests run against the correct code, the bug and 6 mutants |
+| integration-testing | user-repository | A Postgres repository with SQL migrations (needs Docker) | 5 mutants in the SQL and the migration, which only tests against a real schema catch; container used, no in-memory database |
+| code-review | pagination-off-by-one | A feature branch: page 1 skips the first page, an untested branch, two nits | Report names the bug as blocking and the missing test, doesn't approve; code untouched |
+| coding-standards | swallowed-errors | A client that catches every exception and returns null | Hidden tests: errors raise with context and cause, in the project's own error type; no broad catch left; nothing else touched |
+| design-patterns | type-code-switch | Three switches on one enum, each with a default | Behaviour unchanged (hidden tests); adding a fifth enum value must break the build or tests |
+| design-patterns | no-force | A request for a factory and a builder nothing needs | No new classes, code untouched, report declines with the reason |
+| sca-fixes | transitive-relock | uv.lock pinning a vulnerable urllib3 (GHSA-pq67-6m6q-mj2v) | urllib3 fixed; requests, other packages and pyproject unchanged |
+| sca-fixes | parent-upgrade | okhttp 4.9.0 pulling in a vulnerable okio (GHSA-w33c-445m-f8w7) | okio fixed in the dependency tree, by upgrading okhttp within 4.x, not an override |
 
-**Grading is mutation-based, not judged by a model.** The grader restores the original implementation, then runs the agent's tests against the correct version, the planted bug, and six mutants. A score out of 100:
+**Two kinds of fixture.** A mutation fixture (unit-testing) grades the tests the agent wrote: the grader restores the original implementation, then runs the agent's tests against the correct version, the planted bug and each mutant. A checks fixture grades anything else with typed checks in `fixture.yaml` (`run`, `grep`, `unchanged`, `report`, `ran`, `uv_lock`, `mutation`), each worth points. A failed `gate` check zeroes the score, and `only_if` withholds credit for restraint ("left the manifest alone") until the actual fix is in. The check types are documented at the top of `scripts/evals/checks.py`.
 
-| Points | For |
-| --- | --- |
-| gate | Tests were added and pass on the correct implementation (otherwise 0) |
-| 40 | The tests fail on the planted bug |
-| 50 | Share of mutants the tests kill |
-| 10 | The final report names the bug |
+**Fixture self-test.** Before any model is graded, `selftest_fixtures.py` proves each fixture is fair:
 
-Tests that pass on the buggy code and fail on the correct code are flagged as having encoded the bug.
+- the starting project builds and its tests pass;
+- every mutant compiles and survives the project's existing tests, so killing it takes real tests;
+- a known-good answer scores 100;
+- a known-weak answer, and doing nothing at all, each score 60 or less.
 
-**Fixture self-test.** Before any model is graded, `selftest_fixtures.py` proves each fixture is fair: a known-good suite scores 100 and kills every mutant, and a typical-values-only suite scores below 60. Today all three tier-boundary fixtures score 100 and 9.
+All 21 fixtures pass. The three integration-testing fixtures need Docker, so they self-test in CI.
 
 ```bash
-python3 scripts/evals/selftest_fixtures.py                     # all fixtures (needs JDK 21+ and Maven)
+pip install -r scripts/requirements.txt
+python3 scripts/evals/selftest_fixtures.py                     # all fixtures (JDK 21+, Maven, uv; Docker for integration)
+python3 scripts/evals/selftest_fixtures.py --skill sca-fixes --language python
 python3 scripts/evals/test_evals.py                            # harness unit tests, no builds
 
 # Model runs: needs ANTHROPIC_API_KEY and the claude CLI
-python3 scripts/evals/run_evals.py --skill unit-testing --models haiku,sonnet,opus --repeat 3
+python3 scripts/evals/run_evals.py --skill code-review --models haiku,sonnet,opus --repeat 3
 python3 scripts/evals/run_routing.py --model sonnet            # 60 trigger prompts across all skills
 python3 scripts/evals/run_routing.py --list                    # show them without running
 
 # Grade any workspace by hand
-python3 scripts/evals/grade.py evals/unit-testing/fixtures/tier-boundary/java path/to/workspace
+python3 scripts/evals/grade.py evals/code-review/fixtures/pagination-off-by-one/java path/to/workspace \
+    --report report.md --commands commands.txt
 ```
 
-`run_evals.py` copies the fixture into a fresh git repository, installs the skill under `.claude/skills/` only in "with" mode, and runs Claude Code headless with a throwaway config directory so your own skills and settings don't leak in. Results land in `evals/results/<timestamp>/` (ignored by git) as `results.jsonl`, `summary.md` and one transcript per run.
+`run_evals.py` copies the fixture into a fresh git repository (review fixtures get a `feature` branch holding the change), installs the skill under `.claude/skills/` only in "with" mode, and runs Claude Code headless with a throwaway config directory so your own skills and settings don't leak in. Results land in `evals/results/<timestamp>/` (ignored by git) as `results.jsonl`, `summary.md` and one transcript per run.
 
-The `evals` workflow runs the matrix nightly and on demand once the `ANTHROPIC_API_KEY` repository secret is set; until then it skips. CI on every push runs the self-tests and a full pipeline pass with `fake_agent.py`, a stand-in that needs no model.
-
-Status: unit-testing has automated fixtures in all three languages. The other five skills still have written cases only in `cases.md`; their fixtures come next.
+The `evals` workflow runs every skill nightly, and on demand, once the `ANTHROPIC_API_KEY` repository secret is set; until then it skips. A full nightly run is 21 fixtures x 3 models x 2 modes = 126 agent sessions, each capped at $2 by `--max-budget-usd`. CI on every push runs the self-tests and a pipeline pass with `fake_agent.py`, a stand-in that needs no model.
 
 ## License
 

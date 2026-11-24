@@ -1,0 +1,1 @@
+uv run --group test pytest -q
