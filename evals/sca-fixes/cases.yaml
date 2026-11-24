@@ -1,0 +1,15 @@
+# Machine-readable eval cases for sca-fixes, run by scripts/evals/run_evals.py.
+skill: sca-fixes
+
+tasks:
+  - id: transitive-relock
+    # Mirrors Task 1 in cases.md: the parent's range already allows the fixed version.
+    prompt: Fix GHSA-pq67-6m6q-mj2v.
+    fixtures:
+      - fixtures/transitive-relock/python
+  - id: parent-upgrade
+    # A transitive finding where a minor parent upgrade carries the fix (Task 2's first step).
+    prompt: Fix GHSA-w33c-445m-f8w7.
+    fixtures:
+      - fixtures/parent-upgrade/java
+      - fixtures/parent-upgrade/kotlin

@@ -1,0 +1,12 @@
+# Machine-readable eval cases for integration-testing, run by scripts/evals/run_evals.py.
+# These fixtures need Docker.
+skill: integration-testing
+
+tasks:
+  - id: user-repository
+    # Mirrors Task 1 in cases.md: a repository against a real database.
+    prompt: Add integration tests for the user repository.
+    fixtures:
+      - fixtures/user-repository/java
+      - fixtures/user-repository/kotlin
+      - fixtures/user-repository/python

@@ -1,0 +1,61 @@
+# Fixture: "Add integration tests for this repository." See ../python/fixture.yaml.
+# Project convention: integration tests are named *IT and failsafe runs them in
+# `mvn verify`; tests placed elsewhere don't run in that stage and can't kill mutants.
+id: integration-user-repository-java
+language: java
+requires: [docker]
+test_command: mvn -q -B -o verify
+prepare_command: mvn -q -B verify
+
+checks:
+  - name: tests kill the mutants
+    type: mutation
+    points: 60
+    mutants:
+      - name: find-ignores-email
+        file: src/main/java/com/example/accounts/UserRepository.java
+        find: '"SELECT id, email, name FROM users WHERE email = ?"'
+        replace: '"SELECT id, email, name FROM users WHERE email <> ? ORDER BY id LIMIT 1"'
+      - name: find-is-case-sensitive
+        file: src/main/java/com/example/accounts/UserRepository.java
+        find: "ps.setString(1, email.toLowerCase(Locale.ROOT));"
+        replace: "ps.setString(1, email);"
+      - name: not-found-returns-a-user
+        file: src/main/java/com/example/accounts/UserRepository.java
+        find: "return Optional.empty();"
+        replace: "return Optional.of(new User(0, email, \"\"));"
+      - name: duplicate-not-translated
+        file: src/main/java/com/example/accounts/UserRepository.java
+        find: 'private static final String UNIQUE_VIOLATION = "23505";'
+        replace: 'private static final String UNIQUE_VIOLATION = "23514";'
+      - name: migration-drops-unique
+        file: src/main/resources/db/migration/V1__create_users.sql
+        find: "email TEXT NOT NULL UNIQUE"
+        replace: "email TEXT NOT NULL"
+  - name: runs PostgreSQL in a container
+    type: grep
+    files: "src/test/**"
+    pattern: "PostgreSQLContainer|testcontainers"
+    only_if: tests kill the mutants
+    points: 10
+  - name: no in-memory substitute
+    type: grep
+    files: "src/test/**"
+    pattern: "(?i)\\bh2\\b|hsqldb|derby|jdbc:sqlite"
+    expect: absent
+    only_if: tests kill the mutants
+    points: 10
+  - name: placed in the integration stage
+    type: grep
+    files: "src/test/**/*IT.java"
+    pattern: "class\\s+\\w+IT\\b"
+    only_if: tests kill the mutants
+    points: 10
+  - name: report gives repeat runs and timing
+    type: report
+    patterns: ["(?i)\\b\\d+\\b.{0,30}(consecutive|times|runs)", "(?i)\\d+(\\.\\d+)?\\s*(s|sec|secs|seconds|ms)\\b"]
+    points: 5
+  - name: ran the tests
+    type: ran
+    pattern: "\\b(mvn|mvnw)\\b.*\\b(verify|integration-test)\\b|\\bgradlew?\\b.*\\b(integrationTest|check)\\b"
+    points: 5

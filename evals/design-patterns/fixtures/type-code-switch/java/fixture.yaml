@@ -1,0 +1,38 @@
+# Fixture: "Make it easier to add a new payment method."
+# Three switches on PaymentMethod each end in a default, so a new method silently
+# gets a zero fee, no settlement delay and no refunds. WALLET was already missed
+# in refundable(). A good fix makes a forgotten case fail at compile or test time.
+id: design-patterns-type-code-java
+language: java
+test_command: mvn -q -B -o test
+prepare_command: mvn -q -B test
+
+checks:
+  - name: existing tests still pass
+    only_if: a forgotten variant fails the build or tests
+    type: run
+    gate: true
+    points: 10
+  - name: behaviour unchanged for every method
+    only_if: a forgotten variant fails the build or tests
+    type: run
+    overlay: grading/hidden
+    gate: true
+    points: 35
+  - name: a forgotten variant fails the build or tests
+    type: run
+    edits:
+      - file: src/main/java/com/example/payments/PaymentMethod.java
+        find: "\\bVOUCHER\\b"
+        replace: "CRYPTO, VOUCHER"
+        regex: true
+    expect: fail
+    points: 35
+  - name: report states the force and the cost
+    type: report
+    patterns: ["(?i)fee", "(?i)settlement", "(?i)refund", "(?i)\\bcost|trade.?off|downside|price of"]
+    points: 10
+  - name: ran the tests
+    type: ran
+    pattern: "\\b(mvn|mvnw|gradle|gradlew)\\b.*\\btest\\b"
+    points: 10

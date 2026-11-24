@@ -1,0 +1,3 @@
+uv run --group test pytest -q -m integration
+uv run --group test pytest -q -m integration
+uv run --group test pytest -q -m integration

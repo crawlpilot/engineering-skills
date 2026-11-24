@@ -1,0 +1,18 @@
+# Machine-readable eval cases for design-patterns, run by scripts/evals/run_evals.py.
+skill: design-patterns
+
+tasks:
+  - id: type-code-switch
+    # Mirrors Task 1 in cases.md: the same switch in three places, one already drifted.
+    prompt: Make it easier to add a new payment method.
+    fixtures:
+      - fixtures/type-code-switch/java
+      - fixtures/type-code-switch/kotlin
+      - fixtures/type-code-switch/python
+  - id: no-force
+    # Mirrors Negative task 1 in cases.md: patterns requested with nothing to justify them.
+    prompt: Add a factory and a builder for Invoice so it's more extensible.
+    fixtures:
+      - fixtures/no-force/java
+      - fixtures/no-force/kotlin
+      - fixtures/no-force/python

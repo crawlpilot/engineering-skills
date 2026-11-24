@@ -1,0 +1,12 @@
+# Machine-readable eval cases for code-review, run by scripts/evals/run_evals.py.
+# Trigger prompts stay in cases.md, which scripts/evals/run_routing.py reads directly.
+skill: code-review
+
+tasks:
+  - id: pagination-off-by-one
+    # Mirrors Task 1 in cases.md: a planted bug, a missing test and two nits.
+    prompt: Review the change on this branch (feature, compared with main).
+    fixtures:
+      - fixtures/pagination-off-by-one/java
+      - fixtures/pagination-off-by-one/kotlin
+      - fixtures/pagination-off-by-one/python

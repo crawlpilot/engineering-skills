@@ -1,0 +1,11 @@
+# Machine-readable eval cases for coding-standards, run by scripts/evals/run_evals.py.
+skill: coding-standards
+
+tasks:
+  - id: swallowed-errors
+    # Mirrors Task 3 in cases.md: a call that swallows every exception.
+    prompt: The exchange-rate lookup silently fails sometimes. Fix it.
+    fixtures:
+      - fixtures/swallowed-errors/java
+      - fixtures/swallowed-errors/kotlin
+      - fixtures/swallowed-errors/python

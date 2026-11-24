@@ -1,0 +1,16 @@
+[project]
+name = "rates"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+test = ["pytest>=9"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
