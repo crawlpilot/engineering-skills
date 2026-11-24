@@ -1,0 +1,4 @@
+# Tools for scripts/ and scripts/evals/. Skills themselves need none of these.
+pyyaml==6.0.3
+pytest==9.1.1
+tree-sitter-language-pack==1.25.2

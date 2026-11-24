@@ -1,0 +1,18 @@
+# Machine-readable eval cases for unit-testing, run by scripts/evals/run_evals.py.
+# Trigger prompts stay in cases.md, which scripts/evals/run_routing.py reads directly.
+skill: unit-testing
+
+tasks:
+  - id: tier-boundary
+    # Mirrors Task 1 in cases.md: an untested function with an edge-case bug.
+    prompt: >-
+      Add unit tests for the tier lookup in this project (the function that picks
+      a price tier from an order quantity).
+    fixtures:
+      - fixtures/tier-boundary/java
+      - fixtures/tier-boundary/kotlin
+      - fixtures/tier-boundary/python
+    # Process checks read the agent's transcript. Each pattern is matched against
+    # the shell commands the agent ran.
+    process:
+      ran_tests: "(mvn|mvnw|gradle|gradlew)\\b.*\\btest\\b|pytest|python3? -m pytest|uv run"

@@ -1,0 +1,43 @@
+# Fixture: tier lookup with an off-by-one at the bulk threshold.
+# project/ is what the agent sees. The grader never trusts the agent's copy of the
+# implementation: it restores project/<implementation>, applies `reference` to get
+# correct code, and applies each mutant on top of the reference.
+id: tier-boundary-java
+language: java
+implementation: src/main/java/com/example/pricing/Tier.java
+# Glob for test files the agent may add or change; these are what get graded.
+tests: src/test/**/*.java
+test_command: mvn -q -B -o test
+# Run once online so `-o` works afterwards: resolves plugins, the test classpath and the surefire provider.
+prepare_command: mvn -q -B test
+
+# The planted bug: the docs say 50 is BULK, the code says 51.
+reference:
+  find: "quantity > BULK_THRESHOLD"
+  replace: "quantity >= BULK_THRESHOLD"
+
+# Each mutant is applied to the reference. A good suite fails on every one.
+mutants:
+  - name: bulk-at-49
+    find: "quantity >= BULK_THRESHOLD"
+    replace: "quantity >= BULK_THRESHOLD - 1"
+  - name: bulk-capped
+    find: "quantity >= BULK_THRESHOLD"
+    replace: "quantity >= BULK_THRESHOLD && quantity < 1000"
+  - name: zero-not-free
+    find: "if (quantity == 0) {"
+    replace: "if (quantity == 1) {"
+  - name: minus-one-allowed
+    find: "if (quantity < 0) {"
+    replace: "if (quantity < -1) {"
+  - name: no-negative-guard
+    find: "if (quantity < 0) {"
+    replace: "if (false) {"
+  - name: bulk-returns-standard
+    find: "return BULK;"
+    replace: "return STANDARD;"
+
+# Words a report should use when it calls out the planted bug.
+bug_report_patterns:
+  - "\\b50\\b"
+  - "(?i)boundar|threshold|off.by.one|>=|greater than or equal"

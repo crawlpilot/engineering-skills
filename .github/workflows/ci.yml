@@ -15,5 +15,55 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: python3 scripts/validate.py
-      - run: python3 scripts/test_validate.py
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
+      - name: Skill structure and links
+        run: python3 scripts/validate.py && python3 scripts/test_validate.py
+      - name: Every code example parses
+        run: python3 scripts/check_examples.py
+      - name: Eval harness unit tests
+        run: python3 scripts/evals/test_evals.py
+
+  fixtures:
+    # Proves each eval fixture is fair: the project builds, a known-good suite
+    # kills every mutant, and a known-weak suite scores low.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [java, kotlin, python]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
+      - if: matrix.language != 'python'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Fixture self-test
+        run: python3 scripts/evals/selftest_fixtures.py --language ${{ matrix.language }}
+
+  harness:
+    # Runs the full eval pipeline with a stand-in agent: no model calls, no secrets.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+      - run: pip install -r scripts/requirements.txt
+      - name: End-to-end run with the fake agent
+        run: |
+          python3 scripts/evals/run_evals.py --skill unit-testing --language python \
+            --agent-cmd "python3 $GITHUB_WORKSPACE/scripts/evals/fake_agent.py" \
+            --out "$RUNNER_TEMP/eval-plumbing"
+          grep -q "| +92 |" "$RUNNER_TEMP/eval-plumbing/summary.md"
